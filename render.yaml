@@ -1,12 +1,18 @@
 services:
   - type: web
-    name: openai-proxy
+    name: litellm-proxy
     runtime: image
     image:
-      url: ghcr.io/berriai/litellm:main-stable
+      url: ghcr.io/berriai/litellm-database:main-stable
     envVars:
       - key: PORT
         value: 4000
+      - key: DATABASE_URL
+        sync: false  # Set this in Render dashboard as environment variable
+      - key: LITELLM_MASTER_KEY
+        sync: false  # Set this in Render dashboard as environment variable
+      - key: STORE_MODEL_IN_DB
+        value: "True"
     numInstances: 1
     healthCheckPath: /health/liveliness
     autoDeploy: true
