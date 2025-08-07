@@ -13,6 +13,10 @@ services:
         sync: false  # Set this in Render dashboard as environment variable
       - key: STORE_MODEL_IN_DB
         value: "True"
+      - key: DISABLE_SCHEMA_UPDATE
+        value: "false"  # Enable database migrations
+      - key: USE_PRISMA_MIGRATE
+        value: "true"   # Use production-ready migrations
     numInstances: 1
     healthCheckPath: /health/liveliness
     autoDeploy: true
