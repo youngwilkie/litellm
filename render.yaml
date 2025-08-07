@@ -3,7 +3,7 @@ services:
     name: litellm-proxy
     runtime: image
     image:
-      url: ghcr.io/berriai/litellm-database:main-stable
+      url: ghcr.io/berriai/litellm:main-stable
     envVars:
       - key: PORT
         value: 4000
@@ -16,7 +16,7 @@ services:
       - key: DISABLE_SCHEMA_UPDATE
         value: "false"  # Enable database migrations
       - key: USE_PRISMA_MIGRATE
-        value: "true"   # Use production-ready migrations
+        value: "false"   # Use db push instead of migrations
     numInstances: 1
     healthCheckPath: /health/liveliness
     autoDeploy: true
