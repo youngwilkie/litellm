@@ -24,4 +24,4 @@ general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY # CRITICAL: Use environment variable
   store_model_in_db: True
   database_url: os.environ/DATABASE_URL # CRITICAL: Database connection
-  database_connection_pool_limit: 10
+  database_connection_pool_limit: 3 # Reduced to avoid connection limits
