@@ -1,9 +1,8 @@
 services:
   - type: web
     name: litellm-proxy
-    runtime: image
-    image:
-      url: ghcr.io/berriai/litellm:main-stable
+    runtime: docker
+    dockerfilePath: ./Dockerfile
     envVars:
       - key: PORT
         value: 4000
