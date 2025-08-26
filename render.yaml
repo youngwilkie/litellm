@@ -16,6 +16,8 @@ services:
         value: "false"  # Enable database migrations
       - key: USE_PRISMA_MIGRATE
         value: "false"   # Use db push instead of migrations
+      - key: LITELLM_CONFIG_PATH
+        value: "/app/proxy_server_config.yaml"
     numInstances: 1
     healthCheckPath: /health/liveliness
     autoDeploy: true
