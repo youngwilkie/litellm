@@ -15,7 +15,7 @@ model_list:
 litellm_settings:
   # set_verbose: True  # Uncomment this if you want to see verbose logs; not recommended in production
   drop_params: True
-  enable_json_schema_validation: true
+  enable_json_schema_validation: True
   num_retries: 5
   request_timeout: 600
   telemetry: False
