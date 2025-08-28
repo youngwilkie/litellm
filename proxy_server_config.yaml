@@ -25,3 +25,5 @@ general_settings:
   store_model_in_db: True
   database_url: os.environ/DATABASE_URL # CRITICAL: Database connection
   database_connection_pool_limit: 3 # Reduced to avoid connection limits
+  store_model_in_db: true
+  store_prompts_in_spend_logs: true
