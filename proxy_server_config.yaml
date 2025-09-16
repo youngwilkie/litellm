@@ -14,5 +14,5 @@ general_settings:
   store_prompts_in_spend_logs: true
 
 router_settings:
-  routing_strategy: latency-based-routing
+  routing_strategy: simple-shuffle  # Randomly distributes requests across deployments
   optional_pre_call_checks: ["prompt_caching"]
