@@ -116,6 +116,7 @@ from litellm.utils import (
 
 from ._logging import verbose_logger
 from .caching.caching import disable_cache, enable_cache, update_cache
+from .litellm_core_utils.core_helpers import safe_deep_copy
 from .litellm_core_utils.fallback_utils import (
     async_completion_with_fallbacks,
     completion_with_fallbacks,
@@ -2394,47 +2395,7 @@ def completion(  # type: ignore # noqa: PLR0915
                 )
                 return response
             response = model_response
-        elif custom_llm_provider == "cohere":
-            cohere_key = (
-                api_key
-                or litellm.cohere_key
-                or get_secret("COHERE_API_KEY")
-                or get_secret("CO_API_KEY")
-                or litellm.api_key
-            )
-
-            api_base = (
-                api_base
-                or litellm.api_base
-                or get_secret("COHERE_API_BASE")
-                or "https://api.cohere.ai/v1/generate"
-            )
-
-            headers = headers or litellm.headers or {}
-            if headers is None:
-                headers = {}
-
-            if extra_headers is not None:
-                headers.update(extra_headers)
-
-            response = base_llm_http_handler.completion(
-                model=model,
-                stream=stream,
-                messages=messages,
-                acompletion=acompletion,
-                api_base=api_base,
-                model_response=model_response,
-                optional_params=optional_params,
-                litellm_params=litellm_params,
-                custom_llm_provider="cohere",
-                timeout=timeout,
-                headers=headers,
-                encoding=encoding,
-                api_key=cohere_key,
-                logging_obj=logging,  # model call logging done inside the class as we make need to modify I/O to fit aleph alpha's requirements
-                client=client,
-            )
-        elif custom_llm_provider == "cohere_chat":
+        elif custom_llm_provider == "cohere_chat" or custom_llm_provider == "cohere":
             cohere_key = (
                 api_key
                 or litellm.cohere_key
@@ -2847,8 +2808,7 @@ def completion(  # type: ignore # noqa: PLR0915
             )
 
             api_base = api_base or litellm.api_base or get_secret("GEMINI_API_BASE")
-
-            new_params = deepcopy(optional_params)
+            new_params = safe_deep_copy(optional_params or {})
             response = vertex_chat_completion.completion(  # type: ignore
                 model=model,
                 messages=messages,
@@ -2892,7 +2852,7 @@ def completion(  # type: ignore # noqa: PLR0915
 
             api_base = api_base or litellm.api_base or get_secret("VERTEXAI_API_BASE")
 
-            new_params = deepcopy(optional_params)
+            new_params = safe_deep_copy(optional_params or {})
             if vertex_partner_models_chat_completion.is_vertex_partner_model(model):
                 model_response = vertex_partner_models_chat_completion.completion(
                     model=model,
