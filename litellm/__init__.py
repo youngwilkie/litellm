@@ -17,6 +17,7 @@ from typing import (
     TYPE_CHECKING,
 )
 from litellm.types.integrations.datadog_llm_obs import DatadogLLMObsInitParams
+from litellm.types.integrations.datadog import DatadogInitParams
 from litellm.llms.custom_httpx.http_handler import AsyncHTTPHandler, HTTPHandler
 from litellm.caching.caching import Cache, DualCache, RedisCache, InMemoryCache
 from litellm.caching.llm_caching_handler import LLMClientCache
@@ -60,6 +61,7 @@ from litellm.constants import (
     empower_models,
     together_ai_models,
     baseten_models,
+    WANDB_MODELS,
     REPEATED_STREAMING_CHUNK_LIMIT,
     request_timeout,
     open_ai_embedding_models,
@@ -88,6 +90,7 @@ from litellm.types.proxy.management_endpoints.ui_sso import (
     LiteLLM_UpperboundKeyGenerateParams,
 )
 from litellm.types.utils import StandardKeyGenerationConfig, LlmProviders
+from litellm.types.utils import PriorityReservationSettings
 from litellm.integrations.custom_logger import CustomLogger
 from litellm.litellm_core_utils.logging_callback_manager import LoggingCallbackManager
 import httpx
@@ -117,6 +120,7 @@ _custom_logger_compatible_callbacks_literal = Literal[
     "logfire",
     "literalai",
     "dynamic_rate_limiter",
+    "dynamic_rate_limiter_v3",
     "langsmith",
     "prometheus",
     "otel",
@@ -147,6 +151,7 @@ _custom_logger_compatible_callbacks_literal = Literal[
     "aws_sqs",
     "vector_store_pre_call_hook",
     "dotprompt",
+    "bitbucket",
     "cloudzero",
     "posthog",
 ]
@@ -241,6 +246,7 @@ novita_api_key: Optional[str] = None
 snowflake_key: Optional[str] = None
 gradient_ai_api_key: Optional[str] = None
 nebius_key: Optional[str] = None
+wandb_key: Optional[str] = None
 heroku_key: Optional[str] = None
 cometapi_key: Optional[str] = None
 ovhcloud_key: Optional[str] = None
@@ -339,6 +345,7 @@ suppress_debug_info = False
 dynamodb_table_name: Optional[str] = None
 s3_callback_params: Optional[Dict] = None
 datadog_llm_observability_params: Optional[Union[DatadogLLMObsInitParams, Dict]] = None
+datadog_params: Optional[Union[DatadogInitParams, Dict]] = None
 aws_sqs_callback_params: Optional[Dict] = None
 generic_logger_headers: Optional[Dict] = None
 default_key_generate_params: Optional[Dict] = None
@@ -370,6 +377,9 @@ public_model_groups: Optional[List[str]] = None
 public_model_groups_links: Dict[str, str] = {}
 #### REQUEST PRIORITIZATION ######
 priority_reservation: Optional[Dict[str, float]] = None
+priority_reservation_settings: "PriorityReservationSettings" = (
+    PriorityReservationSettings()
+)
 
 
 ######## Networking Settings ########
@@ -435,7 +445,7 @@ def identify(event_details):
 ####### ADDITIONAL PARAMS ################### configurable params if you use proxy models like Helicone, map spend to org id, etc.
 api_base: Optional[str] = None
 headers = None
-api_version = None
+api_version: Optional[str] = None
 organization = None
 project = None
 config_path = None
@@ -486,7 +496,7 @@ azure_ai_models: Set = set()
 jina_ai_models: Set = set()
 voyage_models: Set = set()
 infinity_models: Set = set()
-heroku_models: Set = set() 
+heroku_models: Set = set()
 databricks_models: Set = set()
 cloudflare_models: Set = set()
 codestral_models: Set = set()
@@ -523,6 +533,7 @@ cometapi_models: Set = set()
 oci_models: Set = set()
 vercel_ai_gateway_models: Set = set()
 volcengine_models: Set = set()
+wandb_models: Set = set(WANDB_MODELS)
 ovhcloud_models: Set = set()
 ovhcloud_embedding_models: Set = set()
 
@@ -739,6 +750,8 @@ def add_known_models():
             oci_models.add(key)
         elif value.get("litellm_provider") == "volcengine":
             volcengine_models.add(key)
+        elif value.get("litellm_provider") == "wandb":
+            wandb_models.add(key)
         elif value.get("litellm_provider") == "ovhcloud":
             ovhcloud_models.add(key)
         elif value.get("litellm_provider") == "ovhcloud-embedding-models":
@@ -837,6 +850,7 @@ model_list = list(
     | heroku_models
     | vercel_ai_gateway_models
     | volcengine_models
+    | wandb_models
     | ovhcloud_models
 )
 
@@ -919,6 +933,7 @@ models_by_provider: dict = {
     "cometapi": cometapi_models,
     "oci": oci_models,
     "volcengine": volcengine_models,
+    "wandb": wandb_models,
     "ovhcloud": ovhcloud_models | ovhcloud_embedding_models,
 }
 
@@ -1258,6 +1273,7 @@ from .llms.watsonx.chat.transformation import IBMWatsonXChatConfig
 from .llms.watsonx.embed.transformation import IBMWatsonXEmbeddingConfig
 from .llms.github_copilot.chat.transformation import GithubCopilotConfig
 from .llms.nebius.chat.transformation import NebiusConfig
+from .llms.wandb.chat.transformation import WandbConfig
 from .llms.dashscope.chat.transformation import DashScopeChatConfig
 from .llms.moonshot.chat.transformation import MoonshotChatConfig
 from .llms.v0.chat.transformation import V0ChatConfig
@@ -1334,5 +1350,17 @@ disable_hf_tokenizer_download: Optional[bool] = (
 )
 global_disable_no_log_param: bool = False
 
+### CLI UTILITIES ###
+from litellm.litellm_core_utils.cli_token_utils import get_litellm_gateway_api_key
+
 ### PASSTHROUGH ###
 from .passthrough import allm_passthrough_route, llm_passthrough_route
+
+### GLOBAL CONFIG ###
+global_bitbucket_config: Optional[Dict[str, Any]] = None
+
+
+def set_global_bitbucket_config(config: Dict[str, Any]) -> None:
+    """Set global BitBucket configuration for prompt management."""
+    global global_bitbucket_config
+    global_bitbucket_config = config

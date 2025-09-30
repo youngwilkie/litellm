@@ -13,7 +13,6 @@ from typing import (
     Union,
 )
 
-import fastuuid as uuid
 from aiohttp import FormData
 from openai._models import BaseModel as OpenAIObject
 from openai.types.audio.transcription_create_params import FileTypes  # type: ignore
@@ -33,6 +32,7 @@ from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 from typing_extensions import Callable, Dict, Required, TypedDict, override
 
 import litellm
+from litellm._uuid import uuid
 from litellm.types.llms.base import (
     BaseLiteLLMOpenAIResponseObject,
     LiteLLMPydanticObjectBase,
@@ -122,9 +122,13 @@ class ModelInfoBase(ProviderSpecificModelInfo, total=False):
     max_input_tokens: Required[Optional[int]]
     max_output_tokens: Required[Optional[int]]
     input_cost_per_token: Required[float]
+    input_cost_per_token_flex: Optional[float]  # OpenAI flex service tier pricing
+    input_cost_per_token_priority: Optional[float]  # OpenAI priority service tier pricing
     cache_creation_input_token_cost: Optional[float]
     cache_creation_input_token_cost_above_1hr: Optional[float]
     cache_read_input_token_cost: Optional[float]
+    cache_read_input_token_cost_flex: Optional[float]  # OpenAI flex service tier pricing
+    cache_read_input_token_cost_priority: Optional[float]  # OpenAI priority service tier pricing
     input_cost_per_character: Optional[float]  # only for vertex ai models
     input_cost_per_audio_token: Optional[float]
     input_cost_per_token_above_128k_tokens: Optional[float]  # only for vertex ai models
@@ -142,6 +146,8 @@ class ModelInfoBase(ProviderSpecificModelInfo, total=False):
     input_cost_per_token_batches: Optional[float]
     output_cost_per_token_batches: Optional[float]
     output_cost_per_token: Required[float]
+    output_cost_per_token_flex: Optional[float]  # OpenAI flex service tier pricing
+    output_cost_per_token_priority: Optional[float]  # OpenAI priority service tier pricing
     output_cost_per_character: Optional[float]  # only for vertex ai models
     output_cost_per_audio_token: Optional[float]
     output_cost_per_token_above_128k_tokens: Optional[
@@ -757,10 +763,12 @@ class Delta(OpenAIObject):
             self.function_call = function_call
         if tool_calls is not None and isinstance(tool_calls, list):
             self.tool_calls = []
+            current_index = 0
             for tool_call in tool_calls:
                 if isinstance(tool_call, dict):
                     if tool_call.get("index", None) is None:
-                        tool_call["index"] = 0
+                        tool_call["index"] = current_index
+                        current_index += 1
                     self.tool_calls.append(ChatCompletionDeltaToolCall(**tool_call))
                 elif isinstance(tool_call, ChatCompletionDeltaToolCall):
                     self.tool_calls.append(tool_call)
@@ -2051,6 +2059,28 @@ class StandardLoggingGuardrailInformation(TypedDict, total=False):
 
 StandardLoggingPayloadStatus = Literal["success", "failure"]
 
+class CachingDetails(TypedDict):
+    """
+    Track all caching related metrics, fields for a given request
+    """
+    cache_hit: Optional[bool]
+    """
+    Whether the request hit the cache
+    """
+    cache_duration_ms: Optional[float]
+    """
+    Duration for reading from cache
+    """
+
+class CostBreakdown(TypedDict):
+    """
+    Detailed cost breakdown for a request
+    """
+    input_cost: float  # Cost of input/prompt tokens
+    output_cost: float  # Cost of output/completion tokens (includes reasoning if applicable)
+    total_cost: float  # Total cost (input + output + tool usage)
+    tool_usage_cost: float  # Cost of usage of built-in tools
+
 
 class StandardLoggingPayload(TypedDict):
     id: str
@@ -2058,6 +2088,7 @@ class StandardLoggingPayload(TypedDict):
     call_type: str
     stream: Optional[bool]
     response_cost: float
+    cost_breakdown: Optional[CostBreakdown]  # Detailed cost breakdown
     response_cost_failure_debug_info: Optional[
         StandardLoggingModelCostFailureDebugInformation
     ]
@@ -2395,6 +2426,7 @@ class LlmProviders(str, Enum):
     AUTO_ROUTER = "auto_router"
     VERCEL_AI_GATEWAY = "vercel_ai_gateway"
     DOTPROMPT = "dotprompt"
+    WANDB = "wandb"
     OVHCLOUD = "ovhcloud"
 
 
@@ -2581,6 +2613,12 @@ class SpecialEnums(Enum):
     LITELLM_MANAGED_GENERIC_RESPONSE_COMPLETE_STR = "litellm_proxy;model_id:{};generic_response_id:{}"  # generic implementation of 'managed batches' - used for finetuning and any future work.
 
 
+class ServiceTier(Enum):
+    """Enum for service tier types used in cost calculations."""
+    FLEX = "flex"
+    PRIORITY = "priority"
+
+
 LLMResponseTypes = Union[
     ModelResponse,
     EmbeddingResponse,
@@ -2618,3 +2656,18 @@ CostResponseTypes = Union[
     ImageResponse,
     TranscriptionResponse,
 ]
+
+
+class PriorityReservationSettings(BaseModel):
+    """
+    Settings for priority-based rate limiting reservation.
+    
+    Defines what priority to assign to keys without explicit priority metadata.
+    The priority_reservation mapping is configured separately via litellm.priority_reservation.
+    """
+    default_priority: float = Field(
+        default=0.5,
+        description="Priority level to assign to API keys without explicit priority metadata. Should match a key in litellm.priority_reservation."
+    )
+
+    model_config = ConfigDict(protected_namespaces=())
