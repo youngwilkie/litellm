@@ -1,15 +1,15 @@
 litellm_settings:
   # set_verbose: True  # Uncomment this if you want to see verbose logs; not recommended in production
   drop_params: True
-  enable_json_schema_validation: True
-  num_retries: 5
+  enable_json_schema_validation: False
+  num_retries: 0
   request_timeout: 600
   telemetry: False
 
 general_settings: 
   master_key: os.environ/LITELLM_MASTER_KEY # CRITICAL: Use environment variable
   database_url: os.environ/DATABASE_URL # CRITICAL: Database connection
-  database_connection_pool_limit: 3 # Reduced to avoid connection limits
+  database_connection_pool_limit: 100 # Database connection pool limit
   store_model_in_db: true
   store_prompts_in_spend_logs: true
 
