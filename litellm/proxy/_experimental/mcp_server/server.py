@@ -499,6 +499,13 @@ if MCP_AVAILABLE:
                 )
                 
                 filtered_tools = filter_tools_by_allowed_tools(tools, server)
+                
+                filtered_tools = await filter_tools_by_key_team_permissions(
+                    tools=filtered_tools,
+                    server_id=server_id,
+                    user_api_key_auth=user_api_key_auth,
+                )
+                
                 all_tools.extend(filtered_tools)
                 
                 verbose_logger.debug(
@@ -514,6 +521,38 @@ if MCP_AVAILABLE:
             f"Successfully fetched {len(all_tools)} tools total from all MCP servers"
         )
         return all_tools
+
+    async def filter_tools_by_key_team_permissions(
+        tools: List[MCPTool],
+        server_id: str,
+        user_api_key_auth: Optional[UserAPIKeyAuth],
+    ) -> List[MCPTool]:
+        """
+        Filter tools based on key/team mcp_tool_permissions.
+        
+        Note: Tool names in the DB are stored without server prefixes,
+        but tool names from MCP servers are prefixed. We need to strip
+        the prefix before comparing.
+        """
+        # Filter by key/team tool-level permissions
+        allowed_tool_names = await MCPRequestHandler.get_allowed_tools_for_server(
+            server_id=server_id,
+            user_api_key_auth=user_api_key_auth,
+        )
+        if allowed_tool_names is not None:
+            # Strip prefix from tool names before comparing
+            # Tools are stored in DB without prefix, but come from MCP server with prefix
+            filtered_tools = []
+            for t in tools:
+                # Get tool name without server prefix
+                unprefixed_tool_name, _ = get_server_name_prefix_tool_mcp(t.name)
+                if unprefixed_tool_name in allowed_tool_names:
+                    filtered_tools.append(t)
+        else:
+            # No restrictions, return all tools
+            filtered_tools = tools
+        
+        return filtered_tools
 
     async def _list_mcp_tools(
         user_api_key_auth: Optional[UserAPIKeyAuth] = None,

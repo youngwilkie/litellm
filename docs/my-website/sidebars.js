@@ -333,7 +333,17 @@ const sidebars = {
             "image_variations",
           ]
         },
-        "mcp",
+        {
+          type: "category",
+          label: "/mcp - Model Context Protocol",
+          items: [
+            "mcp",
+            "mcp_usage",
+            "mcp_control",
+            "mcp_cost",
+            "mcp_guardrail",
+          ]
+        },
         "moderation",
         {
           type: "category",
@@ -674,6 +684,7 @@ const sidebars = {
       items: [
         "data_security",
         "data_retention",
+        "proxy/security_encryption_faq",
         "migration_policy",
         {
           type: "category",
